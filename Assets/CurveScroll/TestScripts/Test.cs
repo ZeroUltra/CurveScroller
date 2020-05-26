@@ -1,9 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using DG.Tweening;
-using DG.Tweening.Core.Easing;
-
+using ZeroUltra.CurveScroller;
 public class Test : MonoBehaviour
 {
     public CurveScroller curveScroller;
@@ -23,7 +21,7 @@ public class Test : MonoBehaviour
     {
         if (Input.GetMouseButton(0))
         {
-            float mouseX = Input.GetAxis("Mouse X") * Time.deltaTime;
+            float mouseX = Input.GetAxis("Mouse X") * Time.deltaTime*2;
             curveScroller.DoScroll(mouseX); 
         }
         if (Input.GetMouseButtonUp(0))

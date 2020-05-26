@@ -1,8 +1,9 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using ZeroUltra.CurveScroller;
 
-public class TestData : CurveItemData
+public class TestData : CurveScrollerItemData
 {
 
     public int ID { get; set; }
