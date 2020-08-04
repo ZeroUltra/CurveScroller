@@ -9,36 +9,30 @@ namespace ZeroUltra.CurveScroller
     /// </summary>
     public class CurveScroller : MonoBehaviour
     {
-        #region SerializeField
-        [Header("fixedToBasePos and useInertia choose one!!!")]
-        [Tooltip("是否固定到起始点")]
-        [SerializeField] bool fixedToBasePos;
-        [Range(0, 1f)]
-        [Tooltip("固定滑动时间")]
-        [SerializeField] float fixedDuartion = 0.4f;
+        //事件
+        public event System.Action OnHeadChanged;
+        public event System.Action OnTailChanged;
 
+        #region SerializeField
         [Tooltip("是否使用惯性")]
         [SerializeField] bool useInertia;
-        [Range(0, 1f)]
-        [Tooltip("惯性值")]
-        [SerializeField] float inertiaRate = 0.135f;
+        [Tooltip("是否固定到起始点")]
+        [SerializeField] bool useFixed;
 
-        [Space(10)]
-        [SerializeField] float localScaleRate = 1; //克隆出来缩放系数
         [SerializeField] DOTweenPath tweenPath;
-        [SerializeField] CurveScrollerItemComponent curveItemPrefab;
+        [SerializeField] CurveScrollerItemView curveItemPrefab;
         #endregion
 
         #region Private
         private bool isInit = false;
+        private Coroutine endCoroutine;
         private float[] basePercentages;  //初始百分比 用于还原
         private SmallList<CurveScrollerItemData> listData = new SmallList<CurveScrollerItemData>();  //存放数据
         private List<TransPercentageStruct> listTransPerc = new List<TransPercentageStruct>();  //记录trans 和 百分比
 
         //------------------
-        private float tempOffv = 0;  //用来缓存最后一个滑动值
-        private Tweener inertiaTweenr;
-        private float half0Prec;
+        private float endOffValue;
+        private bool isDragEnd = false;
         #endregion
 
         /// <summary>
@@ -48,11 +42,6 @@ namespace ZeroUltra.CurveScroller
         public void Init(CurveScrollerItemData[] curveItems)
         {
             if (isInit) return;
-            if (tweenPath.path.wpLengths.Length <= 1)
-            {
-                Debug.LogError("tween Path 没有点位信息");
-                return;
-            }
             if (tweenPath.path.wpLengths.Length <= 1)
             {
                 Debug.LogError("tween Path 没有点位信息");
@@ -93,24 +82,25 @@ namespace ZeroUltra.CurveScroller
             //计算比例
             basePercentages = new float[needwplengths.Length];
             float tempPercentage = 0;
-            //遍历 i=1 第一个永远是0
+
             for (int i = 0; i < needwplengths.Length; i++)
             {
                 tempPercentage += needwplengths[i] / pathLength;
                 basePercentages[i] = tempPercentage;
             }
-            half0Prec = basePercentages[0] * 0.5f;
+
             for (int i = 0; i < basePercentages.Length; i++)
             {
                 //克隆对象
-                CurveScrollerItemComponent cutveItem = Instantiate(curveItemPrefab.gameObject).GetComponent<CurveScrollerItemComponent>();
+                CurveScrollerItemView cutveItem = Instantiate(curveItemPrefab.gameObject).GetComponent<CurveScrollerItemView>();
                 cutveItem.transform.transform.SetParent(this.transform);
-                cutveItem.transform.localScale = Vector3.one * localScaleRate;
+                //cutveItem.transform.localScale = Vector3.one;
 
                 CurveScrollerItemData curveItemData = listData.RemoveStart();
                 curveItemData.Percentage = basePercentages[i];
                 cutveItem.SetData(curveItemData);
                 SetTransPosForTweenPerc(cutveItem.transform, basePercentages[i]);
+
                 //添加到列表
                 listTransPerc.Add(new TransPercentageStruct(cutveItem, curveItemData));
             }
@@ -124,7 +114,14 @@ namespace ZeroUltra.CurveScroller
         public void DoScroll(float offv)
         {
             if (isInit == false) Debug.LogError("No Init!!! please Init() first");
-            OnScrollChange(offv, false);
+            isDragEnd = false;
+            this.endOffValue = offv;
+            if (endCoroutine != null)
+            {
+                StopCoroutine(endCoroutine);
+                endCoroutine = null;
+            }
+            OnScrollChange(offv);
         }
 
         /// <summary>
@@ -132,85 +129,19 @@ namespace ZeroUltra.CurveScroller
         /// </summary>
         public void DoScrollEnd()
         {
-            //  Debug.Log(tweenPath)
-            if (fixedToBasePos)
-            {
-                OnEndFixed();
-            }
-            else if (useInertia)
-            {
-                OnendInertia();
-            }
+            isDragEnd = true;
         }
 
-        /// <summary>
-        /// 结束惯性滑动
-        /// </summary>
-        private void OnendInertia()
+        private void OnScrollChange(float _Offsetpercentage)
         {
-            float rate = tempOffv * inertiaRate * 10;
-            if (Mathf.Approximately(rate, 0)) return;
-            inertiaTweenr = DOTween.To(() => tempOffv, x => tempOffv = x, 0, rate).SetSpeedBased(true)
-                .OnUpdate(() => OnScrollChange(tempOffv, true));
-
-        }
-        /// <summary>
-        /// 结束吸附
-        /// </summary>
-        private void OnEndFixed()
-        {
-            //排序 //按照百分比大小排序
-            listTransPerc.Sort(new TransPercentageStruct());
-
-            //判断是否滑动超过一半
-            if (listTransPerc[0].curveItemData.Percentage >= half0Prec)
-            {
-                for (int i = 0; i < listTransPerc.Count; i++)
-                {
-                    int index = i;
-                    TransPercentageStruct itemStruct = listTransPerc[i];
-                    DOTween.To(() => itemStruct.curveItemData.Percentage, x => itemStruct.curveItemData.Percentage = x, basePercentages[index], fixedDuartion).OnUpdate(() =>
-                    {
-                        SetTransPosForTweenPerc(listTransPerc[index].cueveItem.transform, listTransPerc[index].curveItemData.Percentage);
-                        listTransPerc[index] = itemStruct;
-                    });
-                }
-            }
-            //后退一格
-            else
-            {
-                float num = listTransPerc[0].curveItemData.Percentage - 0f;
-                StartCoroutine(IEDoEnd(-num));
-            }
-        }
-        IEnumerator IEDoEnd(float nums)
-        {
-            float timer = fixedDuartion;
-            float offv = nums / timer;
-            while (timer>=0)
-            {
-                timer -= Time.deltaTime;
-                DoScroll(offv*Time.deltaTime);
-                yield return null;
-            }
-        }
-
-        private void OnScrollChange(float offv, bool endAction)
-        {
-            //如果不是结束动作 当拖动的时候 应该关掉惯性tweenr
-            if (!endAction && inertiaTweenr != null && inertiaTweenr.IsPlaying())
-            {
-                inertiaTweenr.Kill();
-            }
-            tempOffv = offv;
             for (int i = 0; i < listTransPerc.Count; i++)
             {
                 int index = i;
                 TransPercentageStruct itemStruct = listTransPerc[i];
-                itemStruct.curveItemData.Percentage += offv;
+                itemStruct.curveItemData.Percentage += _Offsetpercentage;
                 if (itemStruct.curveItemData.Percentage >= 1f)
                 {
-                    itemStruct.cueveItem.transform.SetAsFirstSibling();
+                    itemStruct.curveItemView.transform.SetAsFirstSibling();
 
                     // 取出最后一个然后把当前的插入到开头
                     CurveScrollerItemData data = listData.RemoveEnd();
@@ -219,10 +150,11 @@ namespace ZeroUltra.CurveScroller
 
                     listData.AddStart(itemStruct.curveItemData);
                     itemStruct.SetData(data);
+                    OnTailChanged?.Invoke();
                 }
                 else if (itemStruct.curveItemData.Percentage <= 0f)
                 {
-                    itemStruct.cueveItem.transform.SetAsLastSibling();
+                    itemStruct.curveItemView.transform.SetAsLastSibling();
 
                     //往上滑动 取出第一个然后把当前的插到最后一个
                     CurveScrollerItemData data = listData.RemoveStart();
@@ -231,9 +163,10 @@ namespace ZeroUltra.CurveScroller
                     float offset = 0f - itemStruct.curveItemData.Percentage;
                     data.Percentage = 1f - offset;
                     itemStruct.SetData(data);
+                    OnHeadChanged?.Invoke();
                 }
                 listTransPerc[index] = itemStruct;
-                SetTransPosForTweenPerc(listTransPerc[index].cueveItem.transform, listTransPerc[index].curveItemData.Percentage);
+                SetTransPosForTweenPerc(listTransPerc[index].curveItemView.transform, listTransPerc[index].curveItemData.Percentage);
             }
         }
 
@@ -242,22 +175,102 @@ namespace ZeroUltra.CurveScroller
             trans.position = tweenPath.tween.PathGetPoint(percentage);
         }
 
+        private void LateUpdate()
+        {
+            if (isDragEnd)
+            {
+                if (useInertia && Abs(endOffValue) >0)
+                {
+                    endOffValue = Mathf.Lerp(endOffValue, 0f, 5 * Time.unscaledDeltaTime);
+                    OnScrollChange(this.endOffValue);
+                    if (!useFixed && Abs(endOffValue) - 0 < 0.0001f)
+                    {
+                        endOffValue = 0f;
+                        isDragEnd = false;
+                    }
+                    else if (useFixed && Abs(endOffValue) - 0 < 0.01f)
+                    {
+                        endOffValue = 0f;
+                        endCoroutine = StartCoroutine(IEDoEnd());
+                    }
+                }
+                if (!useInertia && useFixed)
+                {
+                    endCoroutine = StartCoroutine(IEDoEnd());
+                }
+            }
+        }
+        private IEnumerator IEDoEnd()
+        {
+            listTransPerc.Sort(new TransPercentageStruct());
+            //判断第一个是否过半 过半 就直接到目标区域
+            if (listTransPerc[0].curveItemData.Percentage >= basePercentages[0] * 0.5f)
+            {
+
+                while (true)
+                {
+                    yield return null;
+                    for (int i = 0; i < listTransPerc.Count; i++)
+                    {
+                        TransPercentageStruct itemStruct = listTransPerc[i];
+                        itemStruct.curveItemData.Percentage = Mathf.Lerp(itemStruct.curveItemData.Percentage, basePercentages[i], 5 * Time.unscaledDeltaTime);
+                        SetTransPosForTweenPerc(listTransPerc[i].curveItemView.transform, itemStruct.curveItemData.Percentage);
+                    }
+                    if (Abs(listTransPerc[0].curveItemData.Percentage - basePercentages[0]) <= 0.0001f)
+                        break;
+                }
+            }
+            //如果没有过半 就后退 回到上一个的地方
+            else
+            {
+                float d_value = listTransPerc[0].curveItemData.Percentage - 0;
+                //更换收尾
+                while (d_value >= 0)
+                {
+                    yield return null;
+                    if (d_value >= 0)
+                    {
+                        float off = Time.unscaledDeltaTime * 0.5f;
+                        d_value -= off;
+                        OnScrollChange(-off);
+                    }
+                }
+                //更换之后在排序
+                listTransPerc.Sort(new TransPercentageStruct());
+                while (true)
+                {
+                    yield return null;
+                    //归位
+                    for (int i = 0; i < listTransPerc.Count; i++)
+                    {
+                        TransPercentageStruct itemStruct = listTransPerc[i];
+                        itemStruct.curveItemData.Percentage = Mathf.Lerp(itemStruct.curveItemData.Percentage, basePercentages[i], 5 * Time.unscaledDeltaTime);
+                        SetTransPosForTweenPerc(listTransPerc[i].curveItemView.transform, itemStruct.curveItemData.Percentage);
+                    }
+                    if (Abs(listTransPerc[0].curveItemData.Percentage - basePercentages[0]) <= 0.0001f)
+                        break;
+                }
+            }
+            endCoroutine = null;
+            isDragEnd = false;
+        }
+
         #region Struct
         private struct TransPercentageStruct : IComparer<TransPercentageStruct>
         {
-            public CurveScrollerItemComponent cueveItem;
+            public CurveScrollerItemView curveItemView;
             public CurveScrollerItemData curveItemData;
 
-            public TransPercentageStruct(CurveScrollerItemComponent _cueveItem, CurveScrollerItemData _curveItemData)
+            public TransPercentageStruct(CurveScrollerItemView _curveItemView, CurveScrollerItemData _curveItemData)
             {
-                this.cueveItem = _cueveItem;
+                this.curveItemView = _curveItemView;
                 this.curveItemData = _curveItemData;
             }
 
             public void SetData(CurveScrollerItemData _curveItemData)
             {
                 this.curveItemData = _curveItemData;
-                cueveItem.SetData(_curveItemData);
+                curveItemView.SetData(_curveItemData);
             }
             public int Compare(TransPercentageStruct x, TransPercentageStruct y)
             {
@@ -267,5 +280,10 @@ namespace ZeroUltra.CurveScroller
             }
         }
         #endregion
+
+        private float Abs(float v)
+        {
+            return v > 0f ? v : v * -1;
+        }
     }
 }

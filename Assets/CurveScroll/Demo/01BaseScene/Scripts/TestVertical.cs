@@ -1,33 +1,37 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using ZeroUltra.CurveScroller;
-public class Test : MonoBehaviour
+
+public class TestVertical : MonoBehaviour, IDragHandler, IEndDragHandler
 {
+
     public CurveScroller curveScroller;
+
+
     private void Start()
     {
-        int nums = 9;
+        int nums = 20;
         TestData[] curveItem = new TestData[nums];
         for (int i = 0; i < nums; i++)
         {
             curveItem[i] = new TestData(i);
         }
         curveScroller.Init(curveItem);
-      
-           
+
     }
-    private void Update()
+
+
+    public void OnDrag(PointerEventData eventData)
     {
-        if (Input.GetMouseButton(0))
-        {
-            float mouseX = Input.GetAxis("Mouse X") * Time.deltaTime*2;
-            curveScroller.DoScroll(mouseX); 
-        }
-        if (Input.GetMouseButtonUp(0))
-        {
-            curveScroller.DoScrollEnd();
-        }
+        curveScroller.DoScroll(eventData.delta.y * 0.001f);
     }
+
+    public void OnEndDrag(PointerEventData eventData)
+    {
+        curveScroller.DoScrollEnd();
+    }
+
 
 }
