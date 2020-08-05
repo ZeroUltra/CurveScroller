@@ -770,7 +770,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2fd4992a1ff25004ba2fd8bc87767b82, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  useInertia: 0
+  useInertia: 1
   useFixed: 1
   tweenPath: {fileID: 656028598}
   curveItemPrefab: {fileID: 7090272631114033363, guid: 87e255892fbc7c142baa8d273406ec4c,
