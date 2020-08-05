@@ -9,9 +9,9 @@
 
 ![](Imgs/3.gif)
 
-需要注意的地方:
+**需要注意的地方**:
 
-1. 使用了dotween pro 插件 :https://assetstore.unity.com/packages/tools/visual-scripting/dotween-pro-32416
+1. 使用了dotween pro 插件 ,使用的时候必须要导入该插件 :https://assetstore.unity.com/packages/tools/visual-scripting/dotween-pro-32416 
 
 2. dotween path 设置
 
