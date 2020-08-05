@@ -116,6 +116,7 @@ namespace ZeroUltra.CurveScroller
             if (isInit == false) Debug.LogError("No Init!!! please Init() first");
             isDragEnd = false;
             this.endOffValue = offv;
+
             if (endCoroutine != null)
             {
                 StopCoroutine(endCoroutine);
@@ -179,11 +180,11 @@ namespace ZeroUltra.CurveScroller
         {
             if (isDragEnd)
             {
-                if (useInertia && Abs(endOffValue) >0)
+                if (useInertia && Abs(endOffValue) > 0f)
                 {
                     endOffValue = Mathf.Lerp(endOffValue, 0f, 5 * Time.unscaledDeltaTime);
                     OnScrollChange(this.endOffValue);
-                    if (!useFixed && Abs(endOffValue) - 0 < 0.0001f)
+                    if (!useFixed && Abs(endOffValue) - 0 < 0.00001f)
                     {
                         endOffValue = 0f;
                         isDragEnd = false;
@@ -191,16 +192,20 @@ namespace ZeroUltra.CurveScroller
                     else if (useFixed && Abs(endOffValue) - 0 < 0.01f)
                     {
                         endOffValue = 0f;
-                        endCoroutine = StartCoroutine(IEDoEnd());
+                        endCoroutine = StartCoroutine(IEDoFixedEnd());
                     }
                 }
                 if (!useInertia && useFixed)
                 {
-                    endCoroutine = StartCoroutine(IEDoEnd());
+                    if (endCoroutine == null)
+                    {
+                        Debug.Log(11);
+                        endCoroutine = StartCoroutine(IEDoFixedEnd());
+                    }
                 }
             }
         }
-        private IEnumerator IEDoEnd()
+        private IEnumerator IEDoFixedEnd()
         {
             listTransPerc.Sort(new TransPercentageStruct());
             //判断第一个是否过半 过半 就直接到目标区域
@@ -214,10 +219,16 @@ namespace ZeroUltra.CurveScroller
                     {
                         TransPercentageStruct itemStruct = listTransPerc[i];
                         itemStruct.curveItemData.Percentage = Mathf.Lerp(itemStruct.curveItemData.Percentage, basePercentages[i], 5 * Time.unscaledDeltaTime);
-                        SetTransPosForTweenPerc(listTransPerc[i].curveItemView.transform, itemStruct.curveItemData.Percentage);
+                        SetTransPosForTweenPerc(itemStruct.curveItemView.transform, itemStruct.curveItemData.Percentage);
                     }
                     if (Abs(listTransPerc[0].curveItemData.Percentage - basePercentages[0]) <= 0.0001f)
+                    {
+                        for (int i = 0; i < listTransPerc.Count; i++)
+                        {
+                            SetTransPosForTweenPerc(listTransPerc[i].curveItemView.transform, basePercentages[i]);
+                        }
                         break;
+                    }
                 }
             }
             //如果没有过半 就后退 回到上一个的地方
@@ -248,7 +259,14 @@ namespace ZeroUltra.CurveScroller
                         SetTransPosForTweenPerc(listTransPerc[i].curveItemView.transform, itemStruct.curveItemData.Percentage);
                     }
                     if (Abs(listTransPerc[0].curveItemData.Percentage - basePercentages[0]) <= 0.0001f)
+                    {
+                        for (int i = 0; i < listTransPerc.Count; i++)
+                        {
+                            SetTransPosForTweenPerc(listTransPerc[i].curveItemView.transform, basePercentages[i]);
+                        }
                         break;
+
+                    }
                 }
             }
             endCoroutine = null;
